@@ -1,10 +1,21 @@
 package main
 
 import (
+	"fmt"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
 )
+
+type user struct {
+	ID   string `json:"id" form:"id" xml:"id"`
+	Name string `json:"name" form:"name" xml:"name"`
+}
+
+type UserJson struct {
+	Email string `json:"email"`
+	Name  string `json:"name"`
+}
 
 func main() {
 	r := gin.Default() //1.创建路由
@@ -56,6 +67,62 @@ func main() {
 		// 根据ID查询用户
 		user := getUserById(id)
 		c.JSON(http.StatusOK, user)
+	})
+
+	r.GET("/user", func(ctx *gin.Context) {
+		/*
+			http://127.0.0.1:8080/user?name=iphone
+		*/
+		name := ctx.Query("name")
+		age := ctx.DefaultQuery("age", "18")
+		ctx.String(200, "%s,%s", name, age)
+	})
+
+	r.POST("/post", func(ctx *gin.Context) {
+		ctx.Request.ParseForm()
+		name := ctx.PostForm("name")
+		age := ctx.PostForm("age")
+		ctx.JSON(http.StatusOK, gin.H{
+			"name": name,
+			"age":  age,
+		})
+
+	})
+
+	r.POST("/postUser", func(ctx *gin.Context) {
+		var u user
+		ctx.Bind(&u)
+		ctx.String(http.StatusOK, "name=%s,id=%s 嘻嘻嘻", u.Name, u.ID)
+
+	})
+
+	// shouldBindJson
+	r.POST("/postjson", func(ctx *gin.Context) {
+		var u UserJson
+		if err := ctx.ShouldBindJSON(&u); err != nil {
+			ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+
+		}
+		fmt.Printf("%#v\n", u)
+		// 返回响应体给client
+		ctx.JSON(http.StatusOK, gin.H{
+			"email": u.Email,
+			"name":  u.Name,
+		})
+	})
+
+	// shouldbind
+	/*
+		说明shouBind()方法可以根据请求中contentType的不同类型，采用不同的方式进行处理。
+	*/
+	r.POST("/postShouldBind", func(ctx *gin.Context) {
+		var U user
+		if err := ctx.ShouldBind(&U); err != nil {
+			ctx.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+		} else {
+			fmt.Printf("%v\n", U)
+			ctx.JSON(http.StatusOK, gin.H{"id": U.ID, "Name": U.Name})
+		}
 	})
 
 	r.Run() //3.监听端口，默认8080
