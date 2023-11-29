@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"net/http"
+	"path"
 
 	"github.com/gin-gonic/gin"
 )
@@ -73,6 +74,9 @@ func main() {
 		})
 	})
 
+	/*
+		query
+	*/
 	r.GET("/user", func(ctx *gin.Context) {
 		/*
 			http://127.0.0.1:8080/user?name=iphone
@@ -82,17 +86,65 @@ func main() {
 		ctx.String(200, "%s,%s", name, age)
 	})
 
-	r.POST("/post", func(ctx *gin.Context) {
-		ctx.Request.ParseForm()
-		name := ctx.PostForm("name")
-		age := ctx.PostForm("age")
+	r.GET("/userGetQuery", func(ctx *gin.Context) {
+		//第三种方式，考虑的比较全面
+		name, ok := ctx.GetQuery("query")
+		if !ok {
+			name = "someone"
+		}
+		ctx.JSON(http.StatusOK, gin.H{
+			"name": name,
+		})
+	})
+
+	/*
+		postform
+	*/
+	r.LoadHTMLFiles("./login.html", "./index.html")
+	r.GET("/login", func(ctx *gin.Context) {
+		ctx.HTML(http.StatusOK, "login.html", nil)
+	})
+	r.POST("/login", func(ctx *gin.Context) {
+		username := ctx.PostForm("username")
+		password := ctx.PostForm("password")
+		fmt.Println("username,password", username, password)
+		ctx.HTML(http.StatusOK, "index.html", gin.H{
+			"Name":     username,
+			"Password": password,
+		})
+	})
+
+	r.GET("/GetPostForm", func(ctx *gin.Context) {
+		ctx.HTML(http.StatusOK, "login.html", nil)
+	})
+	r.POST("/GetPostForm", func(ctx *gin.Context) {
+		username, ok := ctx.GetPostForm("username")
+		if ok {
+			username = "sb"
+		}
+		password, ok := ctx.GetPostForm("password")
+		if ok {
+			password = "***"
+		}
+		fmt.Println("username,password", username, password)
+		ctx.HTML(http.StatusOK, "index.html", gin.H{
+			"Name":     username,
+			"Password": password,
+		})
+	})
+
+	/*
+	   Param
+	*/
+	r.GET("/:name/:age", func(ctx *gin.Context) {
+		name := ctx.Param("name")
+		age := ctx.Param("age")
+		// respond
 		ctx.JSON(http.StatusOK, gin.H{
 			"name": name,
 			"age":  age,
 		})
-
 	})
-
 	r.POST("/postUser", func(ctx *gin.Context) {
 		var u user
 		ctx.Bind(&u)
@@ -100,7 +152,20 @@ func main() {
 
 	})
 
-	// shouldBindJson
+	/* ShouldBind()
+	它用于将请求携带的参数和后端的结构体绑定起来
+	说明shouBind()方法可以根据请求中contentType的不同类型，采用不同的方式进行处理。
+	*/
+	r.POST("/postShouldBind", func(ctx *gin.Context) {
+		var U user
+		if err := ctx.ShouldBind(&U); err != nil {
+			ctx.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+		} else {
+			fmt.Printf("%v\n", U)
+			ctx.JSON(http.StatusOK, gin.H{"id": U.ID, "Name": U.Name})
+		}
+	})
+
 	r.POST("/postjson", func(ctx *gin.Context) {
 		var u UserJson
 		if err := ctx.ShouldBindJSON(&u); err != nil {
@@ -115,24 +180,32 @@ func main() {
 		})
 	})
 
-	// shouldbind
 	/*
-		说明shouBind()方法可以根据请求中contentType的不同类型，采用不同的方式进行处理。
+		upload 文件
 	*/
-	r.POST("/postShouldBind", func(ctx *gin.Context) {
-		var U user
-		if err := ctx.ShouldBind(&U); err != nil {
-			ctx.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
-		} else {
-			fmt.Printf("%v\n", U)
-			ctx.JSON(http.StatusOK, gin.H{"id": U.ID, "Name": U.Name})
-		}
+	r.LoadHTMLFiles("./upload.html")
+	r.GET("/upload", GetUpload)
+	r.POST("/upload", PostUpload)
+
+	/* redirect*/
+	r.GET("/redirect", func(ctx *gin.Context) {
+		ctx.Redirect(http.StatusMovedPermanently, "https://www.baidu.com")
+		fmt.Println("已经重新定向bing")
 	})
+	r.GET("/a", func(ctx *gin.Context) {
+		ctx.Request.URL.Path = "/b"
+		ctx.Request.Method = "POST"
+		r.HandleContext(ctx)
+	})
+	r.POST("/b", func(ctx *gin.Context) {
+		ctx.JSON(200, gin.H{
+			"message": "b",
+		})
+
+	})
+
 	r.Run() //3.监听端口，默认8080
 
-
-
-	
 }
 
 func getUserById(id string) (str string) {
@@ -144,4 +217,34 @@ func getUserById(id string) (str string) {
 	default:
 		return "NO PHONE BRAND"
 	}
+}
+
+func GetUpload(ctx *gin.Context) {
+	ctx.HTML(http.StatusOK, "upload.html", nil)
+
+}
+func PostUpload(ctx *gin.Context) {
+	if f, err := ctx.FormFile("test"); err != nil {
+		ctx.JSON(http.StatusBadRequest, gin.H{
+			"error": err.Error(),
+		})
+	} else {
+		//将文件保存在服务器
+		//dst := fmt.Sprintf("./%s", f.Filename)//写法1
+		detination := path.Join("C:/Users/hanmingzhou/Desktop/", f.Filename)
+		fmt.Println(detination)
+		err = ctx.SaveUploadedFile(f, detination)
+		if err != nil {
+			ctx.JSON(http.StatusOK, gin.H{
+				"error": err.Error(),
+			})
+		} else {
+			// respond
+			ctx.JSON(http.StatusOK, gin.H{
+				"status": "ok",
+			})
+		}
+
+	}
+
 }
