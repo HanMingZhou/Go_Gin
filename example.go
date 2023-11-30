@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/http"
 	"path"
+	"time"
 
 	"github.com/gin-gonic/gin"
 )
@@ -63,6 +64,9 @@ func main() {
 
 	// }
 
+	/*
+		Param
+	*/
 	r.GET("/users/:id/:name", func(c *gin.Context) {
 		id := c.Param("id")
 		name := c.Param("name")
@@ -71,6 +75,15 @@ func main() {
 		c.JSON(http.StatusOK, gin.H{
 			"name": name,
 			"id":   user,
+		})
+	})
+	r.GET("/:name/:age", func(ctx *gin.Context) {
+		name := ctx.Param("name")
+		age := ctx.Param("age")
+		// respond
+		ctx.JSON(http.StatusOK, gin.H{
+			"name": name,
+			"age":  age,
 		})
 	})
 
@@ -133,18 +146,6 @@ func main() {
 		})
 	})
 
-	/*
-	   Param
-	*/
-	r.GET("/:name/:age", func(ctx *gin.Context) {
-		name := ctx.Param("name")
-		age := ctx.Param("age")
-		// respond
-		ctx.JSON(http.StatusOK, gin.H{
-			"name": name,
-			"age":  age,
-		})
-	})
 	r.POST("/postUser", func(ctx *gin.Context) {
 		var u user
 		ctx.Bind(&u)
@@ -204,8 +205,96 @@ func main() {
 
 	})
 
+	/*
+		router 路由组
+	*/
+	r.Any("/router", func(ctx *gin.Context) {
+		switch ctx.Request.Method {
+		case http.MethodGet:
+			ctx.JSON(http.StatusOK, gin.H{"method": "GET"})
+		case http.MethodPost:
+			ctx.JSON(http.StatusOK, gin.H{"method": "POST"})
+		case http.MethodPut:
+			ctx.JSON(http.StatusOK, gin.H{"method": "PUT"})
+		case http.MethodDelete:
+			ctx.JSON(http.StatusOK, gin.H{"method": "DELETE"})
+		}
+	})
+	r.NoRoute(func(ctx *gin.Context) {
+		ctx.JSON(http.StatusNotFound, gin.H{
+			"message": "no router",
+		})
+	})
+
+	VideoGroup := r.Group("/video")
+	{
+		VideoGroup.GET("/get", func(ctx *gin.Context) {
+			ctx.JSON(http.StatusOK, gin.H{"url": "/video/get"})
+		})
+		VideoGroup.PUT("/put", func(ctx *gin.Context) {
+			ctx.JSON(http.StatusOK, gin.H{"url": "/video/put"})
+		})
+		VideoGroup.POST("/post", func(ctx *gin.Context) {
+			ctx.JSON(http.StatusOK, gin.H{"url": "/video/post"})
+		})
+		VideoGroup.DELETE("/delete", func(ctx *gin.Context) {
+			ctx.JSON(http.StatusOK, gin.H{"url": "/video/delete"})
+		})
+	}
+
+	/*
+	 middle-ware 中间件
+	*/
+	r.GET("/middle-ware", m1, indexHandler)
+	/*
+	 middle-ware 中间件
+	 ctx.Use()  调用后续的处理函数
+	 ctx.Use() 	使用Use(middle_ware...)函数进行全局注册
+	 ctx.Abort()剥夺所有后续的处理函数运行的权利,直接跳过去
+	*/
+	r.Use(m1, m2)
+	r.GET("/shop", indexHandler)
+	r.GET("/game", func(ctx *gin.Context) {
+		ctx.JSON(200, gin.H{
+			"msg": "game",
+		})
+	})
+	r.GET("/food", func(ctx *gin.Context) {
+		ctx.JSON(200, gin.H{
+			"msg": "food",
+		})
+	})
+
 	r.Run() //3.监听端口，默认8080
 
+}
+
+func m1(ctx *gin.Context) {
+	fmt.Println("hi,  m1  ")
+	ctx.JSON(200, gin.H{
+		"message": "this is m1 middleware.",
+	})
+	start := time.Now()
+	/*  调用后续的处理函数*/
+	ctx.Next()
+	time.Sleep(500 * time.Millisecond)
+	cost := time.Since(start)
+	fmt.Println("cost =", cost)
+	fmt.Println("m1 is done")
+}
+func m2(ctx *gin.Context) {
+	fmt.Println("hi,  m2  ")
+	ctx.JSON(200, gin.H{
+		"message": "this is m2 middleware.",
+	})
+	/*  剥夺所有后续的处理函数运行的权利*/
+	ctx.Abort()
+}
+func indexHandler(ctx *gin.Context) {
+	fmt.Println("hi,  indexHandler  ")
+	ctx.JSON(200, gin.H{
+		"message": "this is indexHandler middleware.",
+	})
 }
 
 func getUserById(id string) (str string) {
